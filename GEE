@@ -9,12 +9,20 @@ var createBuffer = function(point, area) {
 
 // Function to check for water bodies within a buffer zone
 var checkWaterBodies = function(buffer) {
-  // Load water body dataset (e.g., USGS National Hydrography Dataset)
-  var waterDataset = ee.FeatureCollection('USGS/WBD/2017/HUC06');
-  // Filter water bodies within the buffer zone
-  var nearbyWater = waterDataset.filterBounds(buffer);
-  // Return the number of nearby water bodies
-  return nearbyWater.size();
+  // Load Global Surface Water dataset
+  var gswDataset = ee.Image('JRC/GSW1_2/GlobalSurfaceWater');
+  // Threshold the occurrence layer to identify water bodies
+  var waterMask = gswDataset.select('occurrence').gt(0);
+  // Clip the water mask to the buffer zone
+  var waterBuffer = waterMask.clip(buffer);
+  // Calculate the total number of water pixels within the buffer
+  var waterCount = waterBuffer.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: buffer,
+    scale: 30, // Adjust scale as needed
+    maxPixels: 1e9 // Set maximum number of pixels to reduce
+  }).getNumber('occurrence');
+  return waterCount;
 };
 
 // Initialize an empty geometry for the selected point
@@ -28,13 +36,12 @@ var updateSelectedPoint = function(coords) {
   var buffer = createBuffer(selectedPoint, 9047);
   // Check for water bodies within the buffer zone
   var waterCount = checkWaterBodies(buffer);
-  // Print the number of nearby water bodies
-  print('Number of nearby water bodies:', waterCount);
-  // Display the selected point and buffer zone on the map
-  Map.clear();
-  Map.centerObject(selectedPoint, 15);
-  Map.addLayer(selectedPoint, {color: 'blue'}, 'Selected Point');
-  Map.addLayer(buffer, {color: 'green'}, 'Buffer Zone');
+  // Print whether water body is present or not
+  if (waterCount.getInfo() > 0) {
+    print('Water body is present within the buffer zone.');
+  } else {
+    print('No water body is present within the buffer zone.');
+  }
 };
 
 // Define a map click event handler
@@ -44,4 +51,4 @@ Map.onClick(function(coords) {
 });
 
 // Display instructions
-print('Click anywhere on the map to select a point and create a buffer of 5047 square meters around it.');
+print('Click anywhere on the map to select a point and create a buffer of 9047 square meters around it.');
