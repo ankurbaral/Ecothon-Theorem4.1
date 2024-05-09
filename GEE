@@ -1,0 +1,47 @@
+// Function to create a buffer around a point with a specified area
+var createBuffer = function(point, area) {
+  // Calculate the radius required to achieve the desired area
+  var radius = Math.sqrt(area / Math.PI);
+  // Create a buffer around the point with the calculated radius
+  var buffer = point.buffer(radius);
+  return buffer;
+};
+
+// Function to check for water bodies within a buffer zone
+var checkWaterBodies = function(buffer) {
+  // Load water body dataset (e.g., USGS National Hydrography Dataset)
+  var waterDataset = ee.FeatureCollection('USGS/WBD/2017/HUC06');
+  // Filter water bodies within the buffer zone
+  var nearbyWater = waterDataset.filterBounds(buffer);
+  // Return the number of nearby water bodies
+  return nearbyWater.size();
+};
+
+// Initialize an empty geometry for the selected point
+var selectedPoint = ee.Geometry.Point(0, 0);
+
+// Function to update selected point
+var updateSelectedPoint = function(coords) {
+  // Set the selected point to the clicked coordinates
+  selectedPoint = ee.Geometry.Point(coords.lon, coords.lat);
+  // Create a buffer around the selected point with an area of 9047 square meters
+  var buffer = createBuffer(selectedPoint, 9047);
+  // Check for water bodies within the buffer zone
+  var waterCount = checkWaterBodies(buffer);
+  // Print the number of nearby water bodies
+  print('Number of nearby water bodies:', waterCount);
+  // Display the selected point and buffer zone on the map
+  Map.clear();
+  Map.centerObject(selectedPoint, 15);
+  Map.addLayer(selectedPoint, {color: 'blue'}, 'Selected Point');
+  Map.addLayer(buffer, {color: 'green'}, 'Buffer Zone');
+};
+
+// Define a map click event handler
+Map.onClick(function(coords) {
+  // Call the function to update selected point when the map is clicked
+  updateSelectedPoint(coords);
+});
+
+// Display instructions
+print('Click anywhere on the map to select a point and create a buffer of 5047 square meters around it.');
