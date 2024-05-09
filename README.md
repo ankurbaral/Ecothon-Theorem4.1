@@ -1,3 +1,3 @@
-The project's culmination aligned with pinpointing a suitable landfill site, a task undertaken in collaboration with the "Ecothon" Hackathon initiative. The process involved integrating AI utilizing OSM and GIS.
-Initially, leveraging OSM, suitable land parcels situated away from water bodies and buildings, while close to roads, were identified.
-Subsequently, utilizing GIS, these identified parcels underwent further refinement based on criteria such as slope and soil quality control.
+The project's culmination aligned with pinpointing a suitable landfill site, a task undertaken in collaboration with the "Ecothon" Hackathon initiative. The process involved integrating AI utilizing (OpenStreetMap)OOSM and (Google Earth Engine)GEE.
+Initially, leveraging OSM, suitable land parcels situated away from buildings, while close to roads, were identified.
+Subsequently, the obtained coordinate from the OSM model was used in GEE to check wether any water body lied near the given point. It was done so by creating a buffer having an area of 9097sq. meter which computed if any water body fell inside of the buffer.
