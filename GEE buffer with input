@@ -1,0 +1,62 @@
+// Function to create a buffer around a point with a specified area
+var createBuffer = function(point, area) {
+  // Calculate the radius required to achieve the desired area
+  var radius = Math.sqrt(area / Math.PI);
+  // Create a buffer around the point with the calculated radius
+  var buffer = point.buffer(radius);
+  return buffer;
+};
+
+// Function to check for water bodies within a buffer zone
+var checkWaterBodies = function(buffer) {
+  // Load Global Surface Water dataset
+  var gswDataset = ee.Image('JRC/GSW1_2/GlobalSurfaceWater');
+  // Threshold the occurrence layer to identify water bodies
+  var waterMask = gswDataset.select('occurrence').gt(0);
+  // Clip the water mask to the buffer zone
+  var waterBuffer = waterMask.clip(buffer);
+  // Calculate the total number of water pixels within the buffer
+  var waterCount = waterBuffer.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: buffer,
+    scale: 30, // Adjust scale as needed
+    maxPixels: 1e9 // Set maximum number of pixels to reduce
+  }).getNumber('occurrence');
+  return waterCount;
+};
+
+// Function to update selected point from input coordinates
+var updateSelectedPointFromInput = function(lon, lat) {
+  // Set the selected point to the provided coordinates
+  var selectedPoint = ee.Geometry.Point(lon, lat);
+  // Center the map on the selected point
+  Map.centerObject(selectedPoint, 10);
+  // Display a marker at the selected point
+  Map.addLayer(selectedPoint, {color: 'blue'}, 'Selected Point');
+  // Create a buffer around the selected point with an area of 9047 square meters
+  var buffer = createBuffer(selectedPoint, 9047);
+  // Check for water bodies within the buffer zone
+  var waterCount = checkWaterBodies(buffer);
+  // Print whether water body is present or not
+  if (waterCount.getInfo() > 0) {
+    print('Water body is present within the buffer zone.');
+  } else {
+    print('No water body is present within the buffer zone.');
+  }
+  // Display the buffer zone on the map
+  Map.addLayer(buffer, {color: 'green'}, 'Buffer Zone');
+};
+
+// Function to prompt the user for coordinates and update the selected point
+var promptForCoordinates = function() {
+  var lon = parseFloat(prompt('Enter longitude:'));
+  var lat = parseFloat(prompt('Enter latitude:'));
+  if (isNaN(lon) || isNaN(lat)) {
+    print('Invalid coordinates. Please enter valid numeric values.');
+    return;
+  }
+  updateSelectedPointFromInput(lon, lat);
+};
+
+// Call the function to prompt for coordinates when the script is run
+promptForCoordinates();
