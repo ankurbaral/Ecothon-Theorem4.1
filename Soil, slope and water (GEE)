@@ -1,0 +1,104 @@
+// Function to create a buffer around a point with a specified area
+var createBuffer = function(point, area) {
+  // Calculate the radius required to achieve the desired area
+  var radius = Math.sqrt(area / Math.PI);
+  // Create a buffer around the point with the calculated radius
+  var buffer = point.buffer(radius);
+  return buffer;
+};
+
+// Function to check for water bodies within a buffer zone
+var checkWaterBodies = function(buffer) {
+  // Load Global Surface Water dataset
+  var gswDataset = ee.Image('JRC/GSW1_2/GlobalSurfaceWater');
+  // Threshold the occurrence layer to identify water bodies
+  var waterMask = gswDataset.select('occurrence').gt(0);
+  // Clip the water mask to the buffer zone
+  var waterBuffer = waterMask.clip(buffer);
+  // Calculate the total number of water pixels within the buffer
+  var waterCount = waterBuffer.reduceRegion({
+    reducer: ee.Reducer.sum(),
+    geometry: buffer,
+    scale: 30, // Adjust scale as needed
+    maxPixels: 1e9 // Set maximum number of pixels to reduce
+  }).getNumber('occurrence');
+  return waterCount;
+};
+
+// Function to calculate slope from elevation data within a buffer zone
+var calculateSlope = function(buffer) {
+  // Load elevation data (assuming it's available in the satellite image)
+  var elevation = ee.Image('USGS/SRTMGL1_003'); // Example elevation data source (SRTM)
+  // Calculate slope
+  var slope = ee.Terrain.slope(elevation);
+  // Clip slope layer to the buffer zone
+  var clippedSlope = slope.clip(buffer);
+  return clippedSlope;
+};
+
+// Function to check soil properties within a buffer zone
+var checkSoilProperties = function(buffer) {
+  // Load soil data (assuming it's available in the satellite image)
+  var soilData = ee.Image('OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02');
+  // Clip soil data to the buffer zone
+  var clippedSoil = soilData.clip(buffer);
+  // Select relevant soil properties for landfill suitability assessment
+  var suitableSoil = clippedSoil.select('b0', 'b10', 'b30'); // Example soil properties
+  // Define thresholds for soil properties (you can adjust these according to your criteria)
+  var clayThreshold = 20; // Example threshold for clay content
+  var sandThreshold = 30; // Example threshold for sand content
+  // Check if soil properties meet criteria for landfill suitability
+  var isSuitable = suitableSoil.expression(
+    '(clay <= clayThreshold) && (sand <= sandThreshold)', {
+      'clay': suitableSoil.select('b0'),
+      'sand': suitableSoil.select('b10'),
+      'clayThreshold': clayThreshold,
+      'sandThreshold': sandThreshold
+  });
+  return isSuitable;
+};
+
+
+// Function to update selected point
+var updateSelectedPoint = function(coords) {
+  // Set the selected point to the clicked coordinates
+  var selectedPoint = ee.Geometry.Point(coords.lon, coords.lat);
+  // Create a buffer around the selected point with an area of 9047 square meters
+  var buffer = createBuffer(selectedPoint, 9047);
+  // Check for water bodies within the buffer zone
+  var waterCount = checkWaterBodies(buffer);
+  // Calculate slope within the buffer zone
+  var slope = calculateSlope(buffer);
+  // Check soil properties within the buffer zone
+  var isSuitableSoil = checkSoilProperties(buffer);
+  // Print suitability assessment based on slope and soil properties
+  if (waterCount.getInfo() > 0) {
+    print('Water body is present within the buffer zone.');
+  } else {
+    if (slope.reduceRegion({
+      reducer: ee.Reducer.mean(),
+      geometry: buffer,
+      scale: 30,
+      maxPixels: 1e9
+    }).get('slope').getInfo() < 10 && isSuitableSoil.getInfo()) {
+      print('The area within the buffer is suitable for landfill.');
+    } else {
+      print('The area within the buffer is not suitable for landfill.');
+    }
+  }
+  // Display the selected point, buffer zone, and slope on the map
+  Map.clear();
+  Map.centerObject(selectedPoint, 10);
+  Map.addLayer(selectedPoint, {color: 'blue'}, 'Selected Point');
+  Map.addLayer(buffer, {color: 'green'}, 'Buffer Zone');
+  Map.addLayer(slope, {min: 0, max: 20, palette: ['white', 'red']}, 'Slope (degrees)');
+};
+
+// Define a map click event handler
+Map.onClick(function(coords) {
+  // Call the function to update the selected point when the map is clicked
+  updateSelectedPoint(coords);
+});
+
+// Display instructions
+print('Click anywhere on the map to select a point and create a buffer of 9047 square meters around it.');
